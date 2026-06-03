@@ -1,0 +1,10 @@
+flask
+librosa
+numpy
+scikit-learn
+joblib
+soundfile
+torch
+torchaudio
+transformers
+praat-parselmouth

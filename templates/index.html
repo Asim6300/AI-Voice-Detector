@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Voice Detector - Authenticate Real vs AI Audio</title>
+    <meta name="description" content="Instantly analyze audio files to detect if they are human-spoken or AI-generated using machine learning.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎙️</text></svg>">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-dark: #090d16;
+            --bg-card: rgba(17, 24, 39, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary: #8b5cf6;
+            --primary-glow: rgba(139, 92, 246, 0.35);
+            --secondary: #3b82f6;
+            --secondary-glow: rgba(59, 130, 246, 0.35);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.2);
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.2);
+            --warning: #f59e0b;
+            --warning-glow: rgba(245, 158, 11, 0.2);
+            --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-family);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ambient background glow */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+            top: -150px;
+            left: -150px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        body::after {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--secondary-glow) 0%, transparent 70%);
+            bottom: -200px;
+            right: -200px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        header {
+            width: 100%;
+            max-width: 1200px;
+            padding: 2rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.5rem;
+            letter-spacing: -0.025em;
+            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px var(--primary-glow);
+        }
+
+        .logo-icon svg {
+            width: 22px;
+            height: 22px;
+            fill: white;
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        main {
+            flex: 1;
+            width: 100%;
+            max-width: 650px;
+            padding: 1rem 1.5rem 4rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .hero h1 {
+            font-size: 2.75rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 1rem;
+            letter-spacing: -0.03em;
+            background: linear-gradient(to right, #ffffff, #cbd5e1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            line-height: 1.6;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 2.5rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Top glow line on card */
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+        }
+
+        .drop-zone {
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.25rem;
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(139, 92, 246, 0.04);
+            box-shadow: inset 0 0 20px rgba(139, 92, 246, 0.05);
+        }
+
+        .upload-icon-container {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone:hover .upload-icon-container {
+            transform: translateY(-4px);
+            color: var(--primary);
+            background: rgba(139, 92, 246, 0.1);
+            border-color: rgba(139, 92, 246, 0.3);
+            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.15);
+        }
+
+        .upload-text h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-text p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .file-info {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-top: 1.5rem;
+            width: 100%;
+        }
+
+        .file-details {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 0;
+        }
+
+        .file-details svg {
+            width: 24px;
+            height: 24px;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .file-name {
+            font-weight: 500;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-size {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .btn-remove {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .btn-remove:hover {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .btn-submit {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-submit:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .btn-submit:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-submit:disabled {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Loading View */
+        .loading-view {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 0;
+            gap: 1.5rem;
+        }
+
+        .spinner-container {
+            position: relative;
+            width: 100px;
+            height: 100px;
+        }
+
+        .pulse-ring {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 2px solid var(--primary);
+            border-radius: 50%;
+            animation: pulse-ring-anim 1.8s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
+        }
+
+        .waveform-spinner {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 3px solid transparent;
+            border-top-color: var(--secondary);
+            border-bottom-color: var(--secondary);
+            border-radius: 50%;
+            animation: spin 1.5s linear infinite;
+        }
+
+        .scanning-mic {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-main);
+            animation: breathe 1.8s ease-in-out infinite;
+        }
+
+        .loading-text {
+            text-align: center;
+        }
+
+        .loading-text h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .loading-text p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+        }
+
+        /* Results View */
+        .result-view {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            width: 100%;
+        }
+
+        .result-badge {
+            padding: 0.75rem 2rem;
+            border-radius: 9999px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .result-badge.human {
+            background: var(--success-glow);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .result-badge.ai {
+            background: var(--danger-glow);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .result-badge.uncertain {
+            background: var(--warning-glow);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .gauge-container {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            gap: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .gauge-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            flex: 1;
+            min-width: 0;
+            transition: all 0.3s;
+        }
+
+        .gauge-card:hover {
+            transform: translateY(-4px);
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .gauge-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .gauge-value {
+            font-size: 2.25rem;
+            font-weight: 700;
+        }
+
+        .gauge-card.human .gauge-value { color: var(--success); }
+        .gauge-card.ai .gauge-value { color: var(--danger); }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.25rem;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            width: 0%;
+            transition: width 1.2s cubic-bezier(0.1, 1, 0.1, 1);
+        }
+
+        .human .progress-bar-fill { background: var(--success); }
+        .ai .progress-bar-fill { background: var(--danger); }
+
+        /* Custom Audio Player */
+        .audio-player-container {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .audio-player-container audio {
+            width: 100%;
+            height: 36px;
+            outline: none;
+        }
+
+        /* Fix default audio player colors in dark mode if browser supports it */
+        audio::-webkit-media-controls-panel {
+            background-color: rgba(15, 23, 42, 0.9);
+        }
+        audio::-webkit-media-controls-current-time-display,
+        audio::-webkit-media-controls-time-remaining-display {
+            color: var(--text-main);
+        }
+
+        .btn-restart {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.03);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-restart:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        footer {
+            width: 100%;
+            max-width: 1200px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            border-top: 1px solid rgba(255, 255, 255, 0.03);
+            margin-top: auto;
+            z-index: 10;
+        }
+
+        /* Animations */
+        @keyframes pulse-ring-anim {
+            0% { transform: scale(0.33); opacity: 1; }
+            80%, 100% { transform: scale(1.3); opacity: 0; }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes breathe {
+            0%, 100% { transform: scale(0.9); opacity: 0.7; }
+            50% { transform: scale(1.1); opacity: 1; filter: drop-shadow(0 0 8px var(--primary)); }
+        }
+
+        @keyframes scaleIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .hero h1 {
+                font-size: 2.25rem;
+            }
+            .card {
+                padding: 1.5rem;
+            }
+            .drop-zone {
+                padding: 2rem 1rem;
+            }
+            .gauge-container {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .logo-text {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
+                </svg>
+            </div>
+            <span class="logo-text">Voicelytics</span>
+        </div>
+        <div class="badge">Model: Random Forest</div>
+    </header>
+
+    <main>
+        <div class="hero">
+            <h1>AI Voice Detector</h1>
+            <p>Verify if an audio clip is spoken by a real human or generated by an artificial voice model.</p>
+        </div>
+
+        <div class="card">
+            <!-- Form Upload View -->
+            <div id="upload-view">
+                <form id="audio-form" enctype="multipart/form-data">
+                    <div class="drop-zone" id="drop-zone">
+                        <div class="upload-icon-container">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                        </div>
+                        <div class="upload-text">
+                            <h3>Upload audio file</h3>
+                            <p>Drag and drop or click to browse</p>
+                            <p style="margin-top: 4px; font-size: 0.75rem;">Supports WAV, MP3, M4A, FLAC</p>
+                        </div>
+                        <input type="file" id="audio-file" name="audio" accept="audio/*" style="display: none;">
+                    </div>
+
+                    <div class="file-info" id="file-info">
+                        <div class="file-details">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 18V5l12-2v13"></path>
+                                <circle cx="6" cy="18" r="3"></circle>
+                                <circle cx="18" cy="16" r="3"></circle>
+                            </svg>
+                            <div style="min-width: 0;">
+                                <div class="file-name" id="selected-file-name">filename.wav</div>
+                                <div class="file-size" id="selected-file-size">1.2 MB</div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-remove" id="btn-remove" title="Remove file">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <button type="submit" class="btn-submit" id="btn-submit" disabled>
+                        Analyze Audio
+                    </button>
+                </form>
+            </div>
+
+            <!-- Loading View -->
+            <div class="loading-view" id="loading-view">
+                <div class="spinner-container">
+                    <div class="pulse-ring"></div>
+                    <div class="waveform-spinner"></div>
+                    <div class="scanning-mic">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                            <path d="M19 10v1a7 7 0 0 1-14 0v-1"></path>
+                            <line x1="12" y1="19" x2="12" y2="22"></line>
+                        </svg>
+                    </div>
+                </div>
+                <div class="loading-text">
+                    <h3>Analyzing Voice Print...</h3>
+                    <p id="loading-subtext">Extracting MFCC and spectral features</p>
+                </div>
+            </div>
+
+            <!-- Results View -->
+            <div class="result-view" id="result-view">
+                <!-- Result Badge -->
+                <div class="result-badge" id="result-badge">
+                    <span id="result-text">HUMAN VOICE</span>
+                </div>
+
+                <div style="text-align: center; color: var(--text-muted); font-size: 0.95rem;">
+                    Analyzed File: <span id="analyzed-filename" style="color: var(--text-main); font-weight: 500;">filename.mp3</span>
+                </div>
+
+                <!-- Circular or Gauge displays -->
+                <div class="gauge-container">
+                    <!-- Human Gauge -->
+                    <div class="gauge-card human">
+                        <span class="gauge-label">Human Score</span>
+                        <div class="gauge-value" id="human-score">0%</div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="human-bar"></div>
+                        </div>
+                    </div>
+
+                    <!-- AI Gauge -->
+                    <div class="gauge-card ai">
+                        <span class="gauge-label">AI Score</span>
+                        <div class="gauge-value" id="ai-score">0%</div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="ai-bar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom Audio Preview -->
+                <div class="audio-player-container">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted)">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                    <audio id="audio-preview" controls></audio>
+                </div>
+
+                <button class="btn-restart" id="btn-restart">
+                    Scan Another Audio Clip
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 Voicelytics. All rights reserved. Secure offline classification powered by Random Forest.</p>
+    </footer>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('audio-file');
+        const fileInfo = document.getElementById('file-info');
+        const selectedFileName = document.getElementById('selected-file-name');
+        const selectedFileSize = document.getElementById('selected-file-size');
+        const btnRemove = document.getElementById('btn-remove');
+        const btnSubmit = document.getElementById('btn-submit');
+        const form = document.getElementById('audio-form');
+
+        const uploadView = document.getElementById('upload-view');
+        const loadingView = document.getElementById('loading-view');
+        const resultView = document.getElementById('result-view');
+
+        const loadingSubtext = document.getElementById('loading-subtext');
+
+        // Results elements
+        const resultBadge = document.getElementById('result-badge');
+        const resultText = document.getElementById('result-text');
+        const humanScore = document.getElementById('human-score');
+        const aiScore = document.getElementById('ai-score');
+        const humanBar = document.getElementById('human-bar');
+        const aiBar = document.getElementById('ai-bar');
+        const analyzedFilename = document.getElementById('analyzed-filename');
+        const audioPreview = document.getElementById('audio-preview');
+        const btnRestart = document.getElementById('btn-restart');
+
+        let audioUrl = null;
+
+        // Click to open file explorer
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        // Handle file selection
+        fileInput.addEventListener('change', handleFileSelect);
+
+        // Drag and drop events
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect();
+            }
+        });
+
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            if (file) {
+                // Display file details
+                selectedFileName.textContent = file.name;
+                selectedFileSize.textContent = formatBytes(file.size);
+                fileInfo.style.display = 'flex';
+                btnSubmit.disabled = false;
+
+                // Create local object URL for preview
+                if (audioUrl) URL.revokeObjectURL(audioUrl);
+                audioUrl = URL.createObjectURL(file);
+                audioPreview.src = audioUrl;
+            } else {
+                resetUploadState();
+            }
+        }
+
+        btnRemove.addEventListener('click', (e) => {
+            e.stopPropagation();
+            resetUploadState();
+        });
+
+        function resetUploadState() {
+            fileInput.value = '';
+            fileInfo.style.display = 'none';
+            btnSubmit.disabled = true;
+            if (audioUrl) {
+                URL.revokeObjectURL(audioUrl);
+                audioUrl = null;
+            }
+            audioPreview.src = '';
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // Submitting file via fetch
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            // Show loading view
+            uploadView.style.display = 'none';
+            loadingView.style.display = 'flex';
+            resultView.style.display = 'none';
+
+            // Simulate parsing updates
+            const messages = [
+                "Decompressing audio streams...",
+                "Running sample rate alignment...",
+                "Extracting Mel-Frequency Cepstral Coefficients...",
+                "Analyzing spectral centroid & roll-off...",
+                "Calculating zero-crossing rates...",
+                "Evaluating vocal pitch & variance...",
+                "Passing signatures through Random Forest classifier..."
+            ];
+            
+            let msgIndex = 0;
+            const textInterval = setInterval(() => {
+                if (msgIndex < messages.length) {
+                    loadingSubtext.textContent = messages[msgIndex++];
+                }
+            }, 600);
+
+            const formData = new FormData();
+            formData.append('audio', file);
+
+            fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("Server error during verification");
+                return res.json();
+            })
+            .then(data => {
+                clearInterval(textInterval);
+                setTimeout(() => {
+                    displayResult(data, file.name);
+                }, 800); // Small delay for aesthetic flow
+            })
+            .catch(err => {
+                clearInterval(textInterval);
+                alert("Error analyzing file: " + err.message);
+                loadingView.style.display = 'none';
+                uploadView.style.display = 'block';
+            });
+        });
+
+        function displayResult(data, filename) {
+            loadingView.style.display = 'none';
+            resultView.style.display = 'flex';
+
+            analyzedFilename.textContent = filename;
+            humanScore.textContent = data.human.toFixed(1) + "%";
+            aiScore.textContent = data.ai.toFixed(1) + "%";
+
+            // Update badge style
+            resultBadge.className = 'result-badge';
+            const res = data.result.toLowerCase();
+            resultBadge.classList.add(res);
+
+            if (res === 'human') {
+                resultText.innerHTML = `
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Human Voice
+                `;
+            } else if (res === 'ai') {
+                resultText.innerHTML = `
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    AI Generated
+                `;
+            } else {
+                resultText.innerHTML = `
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 4h.01" />
+                    </svg>
+                    Uncertain
+                `;
+            }
+
+            // Animate progress bars
+            setTimeout(() => {
+                humanBar.style.width = data.human + "%";
+                aiBar.style.width = data.ai + "%";
+            }, 100);
+        }
+
+        btnRestart.addEventListener('click', () => {
+            resetUploadState();
+            resultView.style.display = 'none';
+            uploadView.style.display = 'block';
+            humanBar.style.width = "0%";
+            aiBar.style.width = "0%";
+        });
+    </script>
+</body>
+</html>
